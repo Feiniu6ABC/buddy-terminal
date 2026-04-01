@@ -32,26 +32,33 @@ def _find_model():
     return None
 
 
+import threading as _threading
+_llm_init_lock = _threading.Lock()
+
+
 def _get_llm():
-    """懒加载 LLM，加载失败返回 None"""
+    """懒加载 LLM，加载失败返回 None（线程安全）"""
     global _llm, _llm_checked
     if _llm_checked:
         return _llm
-    _llm_checked = True
-    model_path = _find_model()
-    if not model_path:
-        return None
-    try:
-        from llama_cpp import Llama
-        _llm = Llama(
-            model_path=model_path,
-            n_ctx=1024,
-            n_threads=4,
-            verbose=False,
-        )
-    except Exception:
-        _llm = None
-    return _llm
+    with _llm_init_lock:
+        if _llm_checked:  # double-check after acquiring lock
+            return _llm
+        _llm_checked = True
+        model_path = _find_model()
+        if not model_path:
+            return None
+        try:
+            from llama_cpp import Llama
+            _llm = Llama(
+                model_path=model_path,
+                n_ctx=1024,
+                n_threads=4,
+                verbose=False,
+            )
+        except Exception:
+            _llm = None
+        return _llm
 
 
 # 属性 → 性格描述 (5档: very low / low / mid / high / very high)
@@ -106,7 +113,6 @@ def _build_system_prompt(name, comp):
     sp_zh = SPECIES_ZH.get(comp["species"], comp["species"])
     stats = comp["stats"]
     peak = max(stats, key=stats.get)
-    dump = min(stats, key=stats.get)
 
     # 根据属性值生成性格描述 (5档)
     traits = []
@@ -236,6 +242,9 @@ _SPECIES_IDLE_HINTS = {
     "capybara": "You chill, sit in warm water, befriend everyone, munch grass, radiate calm energy",
     "cactus":   "You stand still, photosynthesize, grow tiny flowers, store water, poke passersby",
     "robot":    "You beep, run diagnostics, compute things, flash LEDs, recalibrate your sensors",
+    "rabbit":   "You hop around, twitch your nose, nibble on things, thump your foot, hide under desks",
+    "mushroom": "You grow slowly, release spores, sway gently, pop up unexpectedly, glow faintly",
+    "chonk":    "You loaf around, demand food, take up the whole keyboard, purr loudly, judge silently",
 }
 
 

@@ -34,17 +34,19 @@ def dock_companion():
         return
 
     script = _entry_script()
+    runsh = os.path.join(os.path.dirname(script), "run.sh")
+    launcher = f"bash {runsh}" if os.path.isfile(runsh) else f"python3 {script}"
     bn = os.path.basename(script)
     if os.environ.get("TMUX"):
         os.system(f'tmux set-option mouse on')
-        os.system(f'tmux split-window -h -l 20 "python3 {script} compact"')
+        os.system(f'tmux split-window -h -l 20 "{launcher} compact"')
         print(f"  宠物已停靠在右侧窗格！")
         print(f"  {DIM}鼠标点击宠物窗格即可互动 | 关闭: python3 {bn} undock{RST}")
     else:
         os.system(f'tmux new-session -d -s buddy')
         os.system(f'tmux set-option -t buddy mouse on')
         os.system(f'tmux split-window -h -t buddy -l 20 '
-                  f'"python3 {script} compact; tmux kill-session -t buddy"')
+                  f'"{launcher} compact; tmux kill-session -t buddy"')
         os.system(f'tmux select-pane -t buddy:0.0')
         os.system(f'tmux send-keys -t buddy:0.0 '
                   f'"echo \\"  宠物在右边！鼠标点击宠物窗格即可互动\\"" Enter')
@@ -64,7 +66,7 @@ def undock_companion():
         for line in result.stdout.strip().split("\n"):
             parts = line.split(None, 1)
             if len(parts) == 2 and "python" in parts[1].lower():
-                os.system(f"tmux send-keys -t {parts[0]} q")
+                os.system(f"tmux send-keys -t {parts[0]} C-c")
         print(f"  已向宠物窗格发送退出指令")
     else:
         result = subprocess.run(
