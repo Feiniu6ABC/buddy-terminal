@@ -81,3 +81,40 @@ def dw(s):
     """显示宽度 (CJK=2, ANSI转义码=0)"""
     clean = re.sub(r'\033\[[0-9;]*m', '', s)
     return sum(2 if unicodedata.east_asian_width(c) in ('F', 'W') else 1 for c in clean)
+
+
+def wrap_text(text, max_width):
+    """按显示宽度换行，CJK 感知。返回行列表。"""
+    lines = []
+    for paragraph in text.split('\n'):
+        if not paragraph:
+            lines.append("")
+            continue
+        cur = ""
+        cur_w = 0
+        for ch in paragraph:
+            cw = 2 if unicodedata.east_asian_width(ch) in ('F', 'W') else 1
+            if cur_w + cw > max_width:
+                lines.append(cur)
+                cur = ch
+                cur_w = cw
+            else:
+                cur += ch
+                cur_w += cw
+        if cur:
+            lines.append(cur)
+    return lines or [""]
+
+
+def render_bubble(text, color, max_width):
+    """渲染气泡框，自动换行。返回行字符串列表。"""
+    inner_w = max(max_width - 6, 10)  # 减去前缀和边框
+    wrapped = wrap_text(text, inner_w)
+    box_w = max(dw(line) for line in wrapped) + 2
+    out = []
+    out.append(f"  {color}╭{'─' * box_w}╮{RST}")
+    for line in wrapped:
+        pad = box_w - 2 - dw(line)
+        out.append(f"  {color}│{RST} {line}{' ' * pad} {color}│{RST}")
+    out.append(f"  {color}╰{'─' * box_w}╯{RST}")
+    return out

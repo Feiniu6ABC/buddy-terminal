@@ -4,7 +4,7 @@ import os
 import time
 import random
 
-from .constants import BOLD, DIM, RARITY_COLORS, RST, SHINY, SPECIES_ZH, dw
+from .constants import BOLD, DIM, RARITY_COLORS, RST, SHINY, SPECIES_ZH, dw, render_bubble
 from .sprites import render_face
 
 # ─── LLM 引擎 ────────────────────────────────────────
@@ -26,9 +26,9 @@ def _find_model():
         return env_path
     import glob
     for d in MODEL_SEARCH_PATHS:
-        files = sorted(glob.glob(os.path.join(d, MODEL_GLOB)))
+        files = sorted(glob.glob(os.path.join(d, MODEL_GLOB)), key=os.path.getsize, reverse=True)
         if files:
-            return files[0]
+            return files[0]  # 优先用最大的模型
     return None
 
 
@@ -60,10 +60,14 @@ def _build_system_prompt(name, comp):
     peak = max(stats, key=stats.get)
     dump = min(stats, key=stats.get)
     return (
-        f"你是「{name}」，一个住在终端里的{sp_zh}助手。你有两面:\n"
-        f"1. 闲聊时: 可爱、简短、偶尔用颜文字，像一只有个性的{sp_zh}。\n"
-        f"2. 用户问技术问题时(编程、命令、工具等): 直接给出准确答案，可以在末尾加一点{sp_zh}的俏皮话，但答案本身必须正确有用。\n"
-        f"你的突出属性是{peak}({stats[peak]})。回复简洁，不超过三句话。"
+        f"设定: 你是一只叫「{name}」的{sp_zh}。你住在主人的终端里，主人孵化了你，你很依赖主人。"
+        f"你始终用中文回复。你有自己的喜好和情感，像一只真正的{sp_zh}一样思考和说话。\n"
+        f"属性: {', '.join(f'{k}={v}' for k,v in stats.items())}，{peak}最突出。\n"
+        f"规则:\n"
+        f"- 始终保持{sp_zh}的身份，不要说自己是AI、程序或电子宠物\n"
+        f"- 闲聊时可爱简短，可以用颜文字\n"
+        f"- 用户问技术问题时: 先给出准确有用的答案，再加一句符合角色的俏皮话\n"
+        f"- 回复不超过三句话"
     )
 
 # LLM 对话历史 (仅在当前 session 内保持)
@@ -224,10 +228,12 @@ def chat_mode(comp, name):
             if msg.strip().lower() in ('q', 'quit', 'exit', ':q'):
                 break
             reply = chat_reply(msg, name, comp)
-            bw = dw(reply) + 2
-            print(f"  {c}╭{'─' * bw}╮{RST}")
-            print(f"  {c}│{RST} {reply} {c}│{RST}")
-            print(f"  {c}╰{'─' * bw}╯{RST}")
+            try:
+                cols, _ = os.get_terminal_size()
+            except OSError:
+                cols = 80
+            for line in render_bubble(reply, c, cols):
+                print(line)
             print(f"  {c}{face}{RST} {DIM}{name}{RST}")
             print()
     except KeyboardInterrupt:

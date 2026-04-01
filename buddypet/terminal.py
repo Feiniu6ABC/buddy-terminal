@@ -10,7 +10,7 @@ from .constants import (
     BOLD, BUBBLE_SHOW, DIM, FADE_WINDOW, HATS_ZH, IDLE_BUBBLES, IDLE_SEQ,
     PET_BURST, PET_HEARTS, RARITIES, RARITY_COLORS, RARITY_STARS,
     RARITY_WEIGHTS, REACTION, RST, SHINY, SPECIES, SPECIES_ZH, TICK_MS,
-    dw,
+    dw, wrap_text,
 )
 from .sprites import render_face, render_sprite
 from .prng import mulberry32, roll_companion
@@ -152,11 +152,16 @@ def interactive_loop(comp, name, compact_mode=False):
             age = tick - bubble_t
             fading = age >= BUBBLE_SHOW - FADE_WINDOW
             bc = DIM if fading else ""
-            maxw = cols - 6
-            bt = bubble[:maxw]
-            bw = dw(bt) + 2
+            inner_w = max(cols - 8, 10)
+            wrapped = wrap_text(bubble, inner_w)
+            if len(wrapped) > 3:
+                wrapped = wrapped[:3]
+                wrapped[-1] = wrapped[-1].rstrip() + "..."
+            bw = max(dw(l) for l in wrapped) + 2
             lines.append(f" {bc}╭{'─' * bw}╮{RST}")
-            lines.append(f" {bc}│ {bt} │{RST}")
+            for wl in wrapped:
+                pad = bw - 2 - dw(wl)
+                lines.append(f" {bc}│ {wl}{' ' * pad} │{RST}")
             lines.append(f" {bc}╰{'─' * bw}╯{RST}")
         else:
             lines += ["", "", ""]
