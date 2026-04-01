@@ -223,14 +223,22 @@ def interactive_loop(comp, name, compact_mode=False):
                             sbub(random.choice(REACTION["poke"]))
                         elif msg:
                             last_act = time.time()
-                            sbub("...")  # thinking
+                            sbub("thinking...")
                             import threading as _th
+                            # 暂停 idle 线程，避免与聊天抢 LLM 锁
+                            from .chat import stop_idle_gen, start_idle_gen
+                            stop_idle_gen()
                             def _bg_reply(m=msg):
-                                from .chat import chat_reply, _load_history, _chat_history
-                                if not _chat_history:
-                                    _load_history()
-                                r = chat_reply(m, name, comp)
-                                sbub(r)
+                                try:
+                                    from .chat import chat_reply, _load_history, _chat_history
+                                    if not _chat_history:
+                                        _load_history()
+                                    r = chat_reply(m, name, comp)
+                                    sbub(r if r else "(no response)")
+                                except Exception as e:
+                                    sbub(f"(error: {e})")
+                                finally:
+                                    start_idle_gen(name, comp)
                             _th.Thread(target=_bg_reply, daemon=True).start()
                     elif ch in ('\x7f', '\x08'):  # backspace
                         input_buf = input_buf[:-1]
@@ -249,6 +257,10 @@ def interactive_loop(comp, name, compact_mode=False):
 
             if time.time() - last_act > 120:
                 mood = max(30, mood - 0.2)
+
+            # 保持 "thinking..." 气泡不消失
+            if bubble == "thinking..." and (tick - bubble_t) >= BUBBLE_SHOW - 2:
+                bubble_t = tick
 
             if (not bubble or (tick - bubble_t) >= BUBBLE_SHOW) and tick == next_idle_tick:
                 from .chat import get_idle_bubble
