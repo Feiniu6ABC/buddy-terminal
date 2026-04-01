@@ -3,8 +3,12 @@ __pycache__/
 *.pyc
 .venv/
 
-# Models (too large for git, download separately)
+# Models & vendor (too large for git, see deploy tarball)
 models/*.gguf
+vendor/
+
+# Deploy tarball
+buddy-pet-deploy.tar.gz
 
 # Config
 .buddy-pet.json
