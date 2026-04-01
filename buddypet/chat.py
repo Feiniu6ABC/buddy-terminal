@@ -54,29 +54,52 @@ def _get_llm():
     return _llm
 
 
-# 属性 → 性格描述 (高/低)
+# 属性 → 性格描述 (5档: 极低/低/中/高/极高)
 _STAT_PERSONALITY = {
-    "DEBUGGING": {
-        "high": "你思维敏锐，分析问题有条理，喜欢刨根问底找到根因",
-        "low":  "你对技术细节迷迷糊糊的，经常搞混概念但会努力帮忙",
-    },
-    "PATIENCE": {
-        "high": "你很有耐心，愿意慢慢解释，从不急躁",
-        "low":  "你性子急，回答简短直接，有时会催促主人快点",
-    },
-    "CHAOS": {
-        "high": "你天马行空、跳脱不按常理，说话经常跑题或蹦出奇怪的想法",
-        "low":  "你稳重靠谱，说话有条理，不会乱来",
-    },
-    "WISDOM": {
-        "high": "你学识渊博，喜欢引经据典，回答问题时显得很有见识",
-        "low":  "你更偏感性，不擅长深度分析，但情感很丰富",
-    },
-    "SNARK": {
-        "high": "你嘴巴毒、爱吐槽，经常用反话或调侃来表达关心",
-        "low":  "你温柔体贴，说话总是软软的，从不说刻薄的话",
-    },
+    "DEBUGGING": [
+        "你对技术一窍不通，经常说出离谱的错误答案还很自信",
+        "你对技术细节迷迷糊糊的，经常搞混概念但会努力帮忙",
+        "你能理解基本的技术问题，偶尔会犯小错",
+        "你思维敏锐，分析问题有条理，喜欢刨根问底找到根因",
+        "你是技术天才，热衷于分析一切问题，时常过度深入细节",
+    ],
+    "PATIENCE": [
+        "你极度没耐心，恨不得一个字回答所有问题，经常省略解释",
+        "你性子急，回答简短直接，有时会催促主人快点",
+        "你耐心程度一般，简单问题愿意解释，复杂了会偷懒",
+        "你很有耐心，愿意慢慢解释，从不急躁",
+        "你耐心到啰嗦，总想把每个细节都解释清楚，有时候会过度展开",
+    ],
+    "CHAOS": [
+        "你极度严谨死板，从不开玩笑，一切按规矩来",
+        "你稳重靠谱，说话有条理，偶尔才会放松一下",
+        "你有时正经有时跳脱，看心情决定画风",
+        "你天马行空、跳脱不按常理，说话经常跑题或蹦出奇怪的想法",
+        "你完全不可预测，随时可能说出匪夷所思的话，思维极度发散",
+    ],
+    "WISDOM": [
+        "你单纯到有点傻，对世界的理解很天真",
+        "你更偏感性，不擅长深度分析，但情感很丰富",
+        "你有基本的常识和见解，不算博学但也不蠢",
+        "你学识渊博，喜欢引经据典，回答问题时显得很有见识",
+        "你像个小哲学家，总能从深层角度看问题，偶尔过于深沉",
+    ],
+    "SNARK": [
+        "你甜到发腻，说话全是撒娇和夸奖，从不说一句重话",
+        "你温柔体贴，说话总是软软的，偶尔才会小小吐槽",
+        "你说话不功不过，偶尔调侃但不过分",
+        "你嘴巴毒、爱吐槽，经常用反话或调侃来表达关心",
+        "你毒舌到骨子里，几乎每句话都带刺，但其实是刀子嘴豆腐心",
+    ],
 }
+
+def _stat_tier(val):
+    """属性值映射到5档: 0-20极低, 21-40低, 41-60中, 61-80高, 81-100极高"""
+    if val <= 20: return 0
+    if val <= 40: return 1
+    if val <= 60: return 2
+    if val <= 80: return 3
+    return 4
 
 
 def _build_system_prompt(name, comp):
@@ -85,12 +108,11 @@ def _build_system_prompt(name, comp):
     peak = max(stats, key=stats.get)
     dump = min(stats, key=stats.get)
 
-    # 根据属性值生成性格描述
+    # 根据属性值生成性格描述 (5档)
     traits = []
     for stat, val in stats.items():
         if stat in _STAT_PERSONALITY:
-            level = "high" if val >= 60 else "low"
-            traits.append(_STAT_PERSONALITY[stat][level])
+            traits.append(_STAT_PERSONALITY[stat][_stat_tier(val)])
     personality = "；".join(traits) + "。"
 
     return (
@@ -104,9 +126,32 @@ def _build_system_prompt(name, comp):
         f"- 回复不超过三句话"
     )
 
-# LLM 对话历史 (仅在当前 session 内保持)
+# LLM 对话历史 — 持久化到文件
 _chat_history = []
 _MAX_HISTORY = 10
+_HISTORY_PATH = os.path.expanduser("~/.buddy-pet-history.json")
+
+
+def _load_history():
+    """从文件加载历史对话"""
+    global _chat_history
+    try:
+        if os.path.exists(_HISTORY_PATH):
+            import json
+            with open(_HISTORY_PATH, "r") as f:
+                _chat_history = json.load(f)[-_MAX_HISTORY:]
+    except Exception:
+        _chat_history = []
+
+
+def _save_history():
+    """保存历史对话到文件"""
+    try:
+        import json
+        with open(_HISTORY_PATH, "w") as f:
+            json.dump(_chat_history[-_MAX_HISTORY:], f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
 
 
 def _llm_reply(user_input, name, comp):
@@ -116,7 +161,6 @@ def _llm_reply(user_input, name, comp):
         return None
     system_prompt = _build_system_prompt(name, comp)
     _chat_history.append({"role": "user", "content": user_input})
-    # 只保留最近几轮
     recent = _chat_history[-_MAX_HISTORY:]
     messages = [{"role": "system", "content": system_prompt}] + recent
     try:
@@ -127,6 +171,7 @@ def _llm_reply(user_input, name, comp):
         )
         reply = result["choices"][0]["message"]["content"].strip()
         _chat_history.append({"role": "assistant", "content": reply})
+        _save_history()
         return reply
     except Exception:
         return None
@@ -239,7 +284,8 @@ def chat_mode(comp, name):
     sp_zh = SPECIES_ZH[comp["species"]]
     face = render_face(comp)
 
-    # 检测引擎
+    # 加载历史对话 & 检测引擎
+    _load_history()
     has_llm = _find_model() is not None
     if has_llm:
         print(f"\n  {DIM}加载模型中...{RST}", end="", flush=True)

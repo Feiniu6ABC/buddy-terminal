@@ -168,13 +168,17 @@ def interactive_loop(comp, name, compact_mode=False):
 
         lines.append(f" {DIM}{'─' * (cols - 2)}{RST}")
 
-        if compact_mode:
-            for k in ["[p]摸", "[f]喂", "[t]聊", "[k]戳", "[q]退出"]:
-                lines.append(f" {DIM}{k}{RST}")
+        # 输入行 / 快捷键提示
+        if input_buf is not None:
+            lines.append(f" {BOLD}你:{RST} {input_buf}\033[K")
+        elif compact_mode:
+            lines.append(f" {DIM}直接打字聊天 | p摸 f喂 k戳 q退{RST}")
         else:
-            lines.append(f" {BOLD}[p]{RST}摸  {BOLD}[f]{RST}喂  {BOLD}[t]{RST}聊  {BOLD}[k]{RST}戳  {BOLD}[q]{RST}退出")
+            lines.append(f" {DIM}直接打字聊天{RST} | {BOLD}[p]{RST}摸 {BOLD}[f]{RST}喂 {BOLD}[k]{RST}戳 {BOLD}[q]{RST}退出")
 
         return lines
+
+    input_buf = None  # None=普通模式, str=正在输入
 
     sys.stdout.write("\033[?25l\033[2J")
     sys.stdout.flush()
@@ -184,37 +188,49 @@ def interactive_loop(comp, name, compact_mode=False):
         while True:
             if select.select([sys.stdin], [], [], TICK_MS / 1000)[0]:
                 ch = sys.stdin.read(1)
-                if ch in ('q', '\x03'): break
-                elif ch == 'p':
-                    pet_t = tick; mood = min(100, mood + 10); last_act = time.time()
-                    sbub(random.choice(REACTION["pet"]))
-                elif ch == 'f':
-                    mood = min(100, mood + 15); last_act = time.time()
-                    sbub(random.choice(REACTION["feed"]))
-                elif ch == 't':
-                    last_act = time.time()
-                    # 临时退出 raw 模式，让用户输入消息
-                    termios.tcsetattr(fd, termios.TCSADRAIN, old)
-                    sys.stdout.write("\033[?25h")  # 显示光标
-                    sys.stdout.flush()
-                    try:
-                        cols, _ = term_size()
-                        msg = input(f"\r\033[K  {BOLD}你:{RST} ")
-                        sys.stdout.write(f"\033[A\033[K")  # 清掉输入行
-                        if msg.strip():
-                            from .chat import chat_reply
+                if input_buf is not None:
+                    # ── 聊天输入模式 ──
+                    if ch in ('\r', '\n'):
+                        msg = input_buf.strip()
+                        input_buf = None
+                        sys.stdout.write("\033[?25l")
+                        sys.stdout.flush()
+                        if msg:
+                            from .chat import chat_reply, _load_history, _chat_history
+                            if not _chat_history:
+                                _load_history()
+                            last_act = time.time()
                             reply = chat_reply(msg, name, comp)
                             sbub(reply)
-                        else:
-                            sbub(random.choice(REACTION["talk"]))
-                    except (EOFError, KeyboardInterrupt):
-                        sbub(random.choice(REACTION["talk"]))
-                    sys.stdout.write("\033[?25l")  # 隐藏光标
-                    sys.stdout.flush()
-                    tty.setraw(fd)
-                elif ch == 'k':
-                    mood = max(0, mood - 5); last_act = time.time()
-                    sbub(random.choice(REACTION["poke"]))
+                    elif ch in ('\x7f', '\x08'):  # backspace
+                        input_buf = input_buf[:-1]
+                    elif ch == '\x03':  # Ctrl+C 取消输入
+                        input_buf = None
+                        sys.stdout.write("\033[?25l")
+                        sys.stdout.flush()
+                    elif ch == '\x1b':  # Esc 取消输入
+                        input_buf = None
+                        sys.stdout.write("\033[?25l")
+                        sys.stdout.flush()
+                    elif ch.isprintable():
+                        input_buf += ch
+                else:
+                    # ── 普通快捷键模式 ──
+                    if ch in ('q', '\x03'): break
+                    elif ch == 'p':
+                        pet_t = tick; mood = min(100, mood + 10); last_act = time.time()
+                        sbub(random.choice(REACTION["pet"]))
+                    elif ch == 'f':
+                        mood = min(100, mood + 15); last_act = time.time()
+                        sbub(random.choice(REACTION["feed"]))
+                    elif ch == 'k':
+                        mood = max(0, mood - 5); last_act = time.time()
+                        sbub(random.choice(REACTION["poke"]))
+                    elif ch.isprintable() and ch not in ('\r', '\n'):
+                        # 进入聊天输入模式
+                        input_buf = ch
+                        sys.stdout.write("\033[?25h")
+                        sys.stdout.flush()
 
             if time.time() - last_act > 120:
                 mood = max(30, mood - 0.2)
