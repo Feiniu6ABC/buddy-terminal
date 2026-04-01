@@ -179,6 +179,9 @@ def interactive_loop(comp, name, compact_mode=False):
         return lines
 
     input_buf = None  # None=普通模式, str=正在输入
+    next_idle_tick = random.randint(40, 80)  # 首次 idle: 20-40s 后
+    start_time = time.time()
+    next_reminder = 3600 + random.randint(-300, 300)  # ~55-65 min
 
     # 启动 idle 自言自语后台生成
     from .chat import start_idle_gen, stop_idle_gen
@@ -239,10 +242,24 @@ def interactive_loop(comp, name, compact_mode=False):
             if time.time() - last_act > 120:
                 mood = max(30, mood - 0.2)
 
-            if (not bubble or (tick - bubble_t) >= BUBBLE_SHOW) and tick % 30 == 15:
+            if (not bubble or (tick - bubble_t) >= BUBBLE_SHOW) and tick == next_idle_tick:
                 from .chat import get_idle_bubble
                 idle = get_idle_bubble()
-                sbub(idle if idle else random.choice(IDLE_BUBBLES))
+                if idle:
+                    sbub(idle)
+                elif random.random() < 0.3:  # 30% chance for static fallback
+                    sbub(random.choice(IDLE_BUBBLES))
+                # next idle: 40-80 seconds (80-160 ticks)
+                next_idle_tick = tick + random.randint(80, 160)
+
+            # 定时关怀提醒 (~1hr)
+            elapsed = time.time() - start_time
+            if elapsed >= next_reminder:
+                from .chat import get_care_reminder
+                reminder = get_care_reminder(name, comp)
+                if reminder:
+                    sbub(reminder)
+                next_reminder = elapsed + 3600 + random.randint(-300, 300)
 
             write_lines(build())
             tick += 1

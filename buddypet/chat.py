@@ -196,15 +196,51 @@ _idle_thread = None
 _idle_stop = threading.Event()
 
 
+# 物种特有的 idle 行为提示
+_SPECIES_IDLE_HINTS = {
+    "cat":      "You purr, nap, chase imaginary mice, stare at cursors, knead keyboards, groom yourself",
+    "duck":     "You quack softly, waddle around, splash in puddles, preen your feathers, float serenely",
+    "goose":    "You honk at things, stand guard aggressively, chase bugs, steal snacks, strut proudly",
+    "blob":     "You wobble, ooze around, absorb things, jiggle contentedly, blob out in odd shapes",
+    "dragon":   "You breathe tiny sparks, guard your treasure hoard, survey your domain, sharpen claws",
+    "octopus":  "You wave your tentacles, change colors, squeeze into small spaces, ink when startled",
+    "owl":      "You hoot softly, rotate your head, watch everything, ponder deeply, perch silently",
+    "penguin":  "You waddle, slide on your belly, fish for data, huddle for warmth, flap your flippers",
+    "turtle":   "You move slowly, retreat into your shell, bask in warmth, carry wisdom patiently",
+    "snail":    "You slide slowly, leave a trail, hide in your shell, munch on leaves, enjoy the rain",
+    "ghost":    "You float through walls, go invisible, say boo, haunt the terminal, flicker spookily",
+    "axolotl":  "You smile permanently, wave your gills, swim lazily, regenerate, look adorable",
+    "capybara": "You chill, sit in warm water, befriend everyone, munch grass, radiate calm energy",
+    "cactus":   "You stand still, photosynthesize, grow tiny flowers, store water, poke passersby",
+    "robot":    "You beep, run diagnostics, compute things, flash LEDs, recalibrate your sensors",
+}
+
+
 def _build_idle_prompt(name, comp):
-    sp_zh = SPECIES_ZH.get(comp["species"], comp["species"])
+    species = comp["species"]
+    sp_zh = SPECIES_ZH.get(species, species)
+    stats = comp["stats"]
+    hints = _SPECIES_IDLE_HINTS.get(species, f"You act like a typical {species}")
+
+    # 根据属性调整 idle 风格
+    peak = max(stats, key=stats.get)
+    style_hints = []
+    if stats.get("CHAOS", 50) > 60:
+        style_hints.append("your thoughts are random and unpredictable")
+    if stats.get("WISDOM", 50) > 60:
+        style_hints.append("you sometimes have deep or philosophical thoughts")
+    if stats.get("SNARK", 50) > 60:
+        style_hints.append("your mumbles can be sarcastic or grumpy")
+    if stats.get("PATIENCE", 50) < 30:
+        style_hints.append("you're restless and fidgety")
+    style = "; ".join(style_hints) if style_hints else "you're calm and content"
+
     return (
-        f"You are {name}, a {sp_zh} living in a terminal. "
-        f"Generate a single short idle thought or mumble (under 8 words). "
-        f"Examples: 'I wonder what's for dinner...', 'That cloud looks like a fish', "
-        f"'*stretches and yawns*', 'Hmm, what was I thinking about?'\n"
-        f"Be creative and varied. Stay in character as a {sp_zh}. English only. "
-        f"Output ONLY the thought, nothing else."
+        f"You are {name}, a {sp_zh} ({species}) living in a terminal. "
+        f"{hints}. Also, {style}.\n"
+        f"Generate a single short idle thought, action, or mumble (under 8 words). "
+        f"Be creative and varied. No two thoughts should be the same. "
+        f"English only. Output ONLY the thought, nothing else."
     )
 
 
@@ -214,29 +250,36 @@ def _idle_worker(name, comp):
     if llm is None:
         return
     prompt = _build_idle_prompt(name, comp)
+    # 用不同的 "user" 消息来增加多样性
+    prompts_pool = [
+        "What are you thinking?", "What are you doing?",
+        "Say something.", "What do you see?",
+        "How do you feel?", "What's on your mind?",
+    ]
+    idx = 0
     while not _idle_stop.is_set():
         try:
             result = llm.create_chat_completion(
                 messages=[
                     {"role": "system", "content": prompt},
-                    {"role": "user", "content": "Say something."},
+                    {"role": "user", "content": prompts_pool[idx % len(prompts_pool)]},
                 ],
                 max_tokens=32,
                 temperature=1.0,
             )
+            idx += 1
             text = result["choices"][0]["message"]["content"].strip()
             import re as _re
             text = _re.sub(r'<think>[\s\S]*?</think>\s*', '', text).strip()
             if '<think>' in text:
                 text = ""
-            # 清理引号
             text = text.strip('"\'')
             if text and len(text) < 60:
-                _idle_queue.put(text, timeout=30)
+                _idle_queue.put(text, timeout=60)
         except Exception:
             pass
-        # 等一会再生成下一条
-        _idle_stop.wait(10)
+        # 生成间隔拉长，避免频繁调用 LLM
+        _idle_stop.wait(20)
 
 
 def start_idle_gen(name, comp):
@@ -260,6 +303,47 @@ def get_idle_bubble():
         return _idle_queue.get_nowait()
     except queue.Empty:
         return None
+
+
+def get_care_reminder(name, comp):
+    """生成关怀提醒（喝水、休息等），用 LLM 或 fallback"""
+    llm = _get_llm()
+    sp_zh = SPECIES_ZH.get(comp["species"], comp["species"])
+    if llm:
+        try:
+            result = llm.create_chat_completion(
+                messages=[
+                    {"role": "system", "content":
+                        f"You are {name}, a {sp_zh} ({comp['species']}). "
+                        f"Your owner has been working for over an hour. "
+                        f"Remind them to take a break in your own style. "
+                        f"Suggest ONE of: drink water, stretch, rest eyes, take a walk, grab a snack. "
+                        f"Keep it under 10 words, cute and caring. English only."},
+                    {"role": "user", "content": "Remind me."},
+                ],
+                max_tokens=32,
+                temperature=0.9,
+            )
+            text = result["choices"][0]["message"]["content"].strip()
+            import re as _re
+            text = _re.sub(r'<think>[\s\S]*?</think>\s*', '', text).strip()
+            if '<think>' in text:
+                text = ""
+            text = text.strip('"\'')
+            if text and len(text) < 60:
+                return text
+        except Exception:
+            pass
+    # fallback
+    import random as _rand
+    fallbacks = [
+        f"Hey! {name} says drink some water!",
+        f"*nudge* Take a break, stretch a bit!",
+        f"Your eyes need rest! Look away for 20s~",
+        f"*poke* Go grab a snack, you deserve it!",
+        f"Stand up and stretch! {name} is watching~",
+    ]
+    return _rand.choice(fallbacks)
 
 
 # ─── 关键词 fallback 引擎 ──────────────────────────────
