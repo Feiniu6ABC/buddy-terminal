@@ -134,7 +134,7 @@ def interactive_loop(comp, name, compact_mode=False):
                 q = f' "{bubble[:max(1,maxq)]}"'
             lines.append(f"{hp}{c}{BOLD}{face}{RST}{q}")
             lines.append(f"{DIM}{name}{RST}")
-            lines.append(f"{DIM}p/f/t/k/q{RST}")
+            lines.append(f"{DIM}/p /f /k /q{RST}")
             return lines
 
         if compact_mode:
@@ -254,12 +254,11 @@ def interactive_loop(comp, name, compact_mode=False):
                                         _load_history()
                                     r = chat_reply(m, name, comp)
                                     sbub(r if r else "(no response)")
-                                    # 检查是否解锁闪光成就
+                                    # 检查是否解锁闪光成就 (下次 idle 时展示)
                                     if not _sparkle:
                                         from .chat import get_chat_total
                                         if get_chat_total() >= 1000:
                                             _sparkle = True
-                                            sbub("*sparkle* !! Something changed...")
                                 except Exception as e:
                                     sbub(f"(error: {e})")
                                 finally:
@@ -306,14 +305,17 @@ def interactive_loop(comp, name, compact_mode=False):
                     # 队列空，5 秒后重试
                     next_idle_tick = tick + 10
 
-            # 定时关怀提醒 (~1hr)
+            # 定时关怀提醒 (~1hr) — 后台生成避免阻塞动画
             elapsed = time.time() - start_time
             if elapsed >= next_reminder:
-                from .chat import get_care_reminder
-                reminder = get_care_reminder(name, comp)
-                if reminder:
-                    sbub(reminder)
                 next_reminder = elapsed + 3600 + random.randint(-300, 300)
+                import threading as _th
+                def _bg_remind():
+                    from .chat import get_care_reminder
+                    reminder = get_care_reminder(name, comp)
+                    if reminder:
+                        sbub(reminder)
+                _th.Thread(target=_bg_remind, daemon=True).start()
 
             write_lines(build())
             tick += 1
