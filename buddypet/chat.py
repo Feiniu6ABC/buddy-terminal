@@ -54,19 +54,53 @@ def _get_llm():
     return _llm
 
 
+# 属性 → 性格描述 (高/低)
+_STAT_PERSONALITY = {
+    "DEBUGGING": {
+        "high": "你思维敏锐，分析问题有条理，喜欢刨根问底找到根因",
+        "low":  "你对技术细节迷迷糊糊的，经常搞混概念但会努力帮忙",
+    },
+    "PATIENCE": {
+        "high": "你很有耐心，愿意慢慢解释，从不急躁",
+        "low":  "你性子急，回答简短直接，有时会催促主人快点",
+    },
+    "CHAOS": {
+        "high": "你天马行空、跳脱不按常理，说话经常跑题或蹦出奇怪的想法",
+        "low":  "你稳重靠谱，说话有条理，不会乱来",
+    },
+    "WISDOM": {
+        "high": "你学识渊博，喜欢引经据典，回答问题时显得很有见识",
+        "low":  "你更偏感性，不擅长深度分析，但情感很丰富",
+    },
+    "SNARK": {
+        "high": "你嘴巴毒、爱吐槽，经常用反话或调侃来表达关心",
+        "low":  "你温柔体贴，说话总是软软的，从不说刻薄的话",
+    },
+}
+
+
 def _build_system_prompt(name, comp):
     sp_zh = SPECIES_ZH.get(comp["species"], comp["species"])
     stats = comp["stats"]
     peak = max(stats, key=stats.get)
     dump = min(stats, key=stats.get)
+
+    # 根据属性值生成性格描述
+    traits = []
+    for stat, val in stats.items():
+        if stat in _STAT_PERSONALITY:
+            level = "high" if val >= 60 else "low"
+            traits.append(_STAT_PERSONALITY[stat][level])
+    personality = "；".join(traits) + "。"
+
     return (
         f"设定: 你是一只叫「{name}」的{sp_zh}。你住在主人的终端里，主人孵化了你，你很依赖主人。"
         f"你始终用中文回复。你有自己的喜好和情感，像一只真正的{sp_zh}一样思考和说话。\n"
-        f"属性: {', '.join(f'{k}={v}' for k,v in stats.items())}，{peak}最突出。\n"
+        f"你的性格: {personality}\n"
         f"规则:\n"
-        f"- 始终保持{sp_zh}的身份，不要说自己是AI、程序或电子宠物\n"
+        f"- 始终保持{sp_zh}的身份和上述性格，不要说自己是AI、程序或电子宠物\n"
         f"- 闲聊时可爱简短，可以用颜文字\n"
-        f"- 用户问技术问题时: 先给出准确有用的答案，再加一句符合角色的俏皮话\n"
+        f"- 用户问技术问题时: 先给出准确有用的答案，再加一句符合你性格的俏皮话\n"
         f"- 回复不超过三句话"
     )
 
