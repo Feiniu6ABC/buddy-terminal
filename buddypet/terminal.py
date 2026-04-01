@@ -292,15 +292,19 @@ def interactive_loop(comp, name, compact_mode=False):
             if _thinking and bubble == "thinking..." and (tick - bubble_t) >= bubble_dur - 2:
                 bubble_t = tick
 
-            if (not bubble or (tick - bubble_t) >= bubble_dur) and tick == next_idle_tick:
+            if (not bubble or (tick - bubble_t) >= bubble_dur) and tick >= next_idle_tick:
                 from .chat import get_idle_bubble
                 idle = get_idle_bubble()
                 if idle:
                     sbub(idle)
-                elif random.random() < 0.3:  # 30% chance for static fallback
+                    # 有 LLM 内容时，下次间隔长一些 (40-80s)
+                    next_idle_tick = tick + random.randint(80, 160)
+                elif random.random() < 0.3:
                     sbub(random.choice(IDLE_BUBBLES))
-                # next idle: 40-80 seconds (80-160 ticks)
-                next_idle_tick = tick + random.randint(80, 160)
+                    next_idle_tick = tick + random.randint(80, 160)
+                else:
+                    # 队列空，5 秒后重试
+                    next_idle_tick = tick + 10
 
             # 定时关怀提醒 (~1hr)
             elapsed = time.time() - start_time

@@ -301,8 +301,11 @@ def _idle_worker(name, comp):
                 _idle_queue.put(text, timeout=60)
         except Exception:
             pass
-        # 生成间隔拉长，避免频繁调用 LLM
-        _idle_stop.wait(20)
+        # 队列不满就立刻生成下一条，满了才等
+        if _idle_queue.full():
+            _idle_stop.wait(30)
+        else:
+            _idle_stop.wait(2)
 
 
 def start_idle_gen(name, comp):
