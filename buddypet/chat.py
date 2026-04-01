@@ -166,10 +166,18 @@ def _llm_reply(user_input, name, comp):
     try:
         result = llm.create_chat_completion(
             messages=messages,
-            max_tokens=128,
-            temperature=0.8,
+            max_tokens=512,
+            temperature=0.7,
         )
         reply = result["choices"][0]["message"]["content"].strip()
+        # Qwen3 会输出 <think>...</think> 思考过程，只保留最终回复
+        import re as _re
+        reply = _re.sub(r'<think>[\s\S]*?</think>\s*', '', reply).strip()
+        # 如果思考过程没闭合（被截断），丢弃整个 think 块
+        if '<think>' in reply:
+            reply = reply.split('</think>')[-1].strip() if '</think>' in reply else ""
+        if not reply:
+            return None
         _chat_history.append({"role": "assistant", "content": reply})
         _save_history()
         return reply
