@@ -3,9 +3,20 @@
 
 import os, sys
 # 自动加载 vendor/ 目录中的依赖（内网部署用）
+# 检查 vendor 里的 cpython .so 是否匹配当前 Python 版本
 _vendor = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor")
 if os.path.isdir(_vendor) and _vendor not in sys.path:
-    sys.path.insert(0, _vendor)
+    _pytag = f"cpython-{sys.version_info.major}{sys.version_info.minor}"
+    _use_vendor = True
+    for _root, _dirs, _files in os.walk(_vendor):
+        for _f in _files:
+            if ".cpython-" in _f and _f.endswith(".so"):
+                _use_vendor = _pytag in _f
+                break
+        if not _use_vendor:
+            break
+    if _use_vendor:
+        sys.path.insert(0, _vendor)
 
 import argparse
 import time
