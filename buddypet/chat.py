@@ -130,21 +130,30 @@ def _build_system_prompt(name, comp):
     )
 
 # LLM 对话历史 — 持久化到文件
-_chat_history = []
-_MAX_HISTORY = 10
+_chat_history = []       # 完整历史 (全部持久化到磁盘)
+_chat_total = 0          # 总对话条数 (用于闪光成就)
+_LLM_CONTEXT = 20        # 送入 LLM 的最近对话条数
 _HISTORY_PATH = os.path.expanduser("~/.buddy-pet-history.json")
 
 
 def _load_history():
     """从文件加载历史对话"""
-    global _chat_history
+    global _chat_history, _chat_total
     try:
         if os.path.exists(_HISTORY_PATH):
             import json
             with open(_HISTORY_PATH, "r") as f:
-                _chat_history = json.load(f)[-_MAX_HISTORY:]
+                data = json.load(f)
+            if isinstance(data, dict):
+                _chat_history = data.get("messages", [])
+                _chat_total = data.get("total", len(_chat_history))
+            else:
+                # 兼容旧格式 (纯列表)
+                _chat_history = data
+                _chat_total = len(data)
     except Exception:
         _chat_history = []
+        _chat_total = 0
 
 
 def _save_history():
@@ -152,9 +161,17 @@ def _save_history():
     try:
         import json
         with open(_HISTORY_PATH, "w") as f:
-            json.dump(_chat_history[-_MAX_HISTORY:], f, ensure_ascii=False, indent=2)
+            json.dump({
+                "messages": _chat_history,
+                "total": _chat_total,
+            }, f, ensure_ascii=False, indent=2)
     except Exception:
         pass
+
+
+def get_chat_total():
+    """返回总对话条数"""
+    return _chat_total
 
 
 def _llm_reply(user_input, name, comp):
@@ -163,8 +180,10 @@ def _llm_reply(user_input, name, comp):
     if llm is None:
         return None
     system_prompt = _build_system_prompt(name, comp)
+    global _chat_total
     _chat_history.append({"role": "user", "content": user_input})
-    recent = _chat_history[-_MAX_HISTORY:]
+    _chat_total += 1
+    recent = _chat_history[-_LLM_CONTEXT:]
     messages = [{"role": "system", "content": system_prompt}] + recent
     try:
         with _llm_lock:
@@ -183,6 +202,7 @@ def _llm_reply(user_input, name, comp):
         if not reply:
             return None
         _chat_history.append({"role": "assistant", "content": reply})
+        _chat_total += 1
         _save_history()
         return reply
     except Exception:
@@ -288,8 +308,10 @@ def _idle_worker(name, comp):
 def start_idle_gen(name, comp):
     """启动 idle 生成后台线程"""
     global _idle_thread
+    # 确保旧线程已停止
     if _idle_thread and _idle_thread.is_alive():
-        return
+        _idle_stop.set()
+        _idle_thread.join(timeout=3)
     _idle_stop.clear()
     _idle_thread = threading.Thread(target=_idle_worker, args=(name, comp), daemon=True)
     _idle_thread.start()

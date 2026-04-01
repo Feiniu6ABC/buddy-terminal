@@ -75,7 +75,8 @@ def interactive_loop(comp, name, compact_mode=False):
     """统一的交互循环 — 支持全屏和紧凑模式"""
     import tty, termios
 
-    c = SHINY if comp["shiny"] else RARITY_COLORS[comp["rarity"]]
+    c_base = SHINY if comp["shiny"] else RARITY_COLORS[comp["rarity"]]
+    c = c_base
     stars = RARITY_STARS[comp["rarity"]]
     sp_zh = SPECIES_ZH[comp["species"]]
 
@@ -90,6 +91,15 @@ def interactive_loop(comp, name, compact_mode=False):
 
     bubble_dur = BUBBLE_SHOW  # 当前气泡显示时长 (ticks)
     _thinking = False         # LLM 正在生成中，阻塞输入
+
+    # 隐藏成就：1000 条对话解锁闪光
+    _sparkle = False
+    try:
+        from .chat import _load_history, get_chat_total
+        _load_history()
+        _sparkle = get_chat_total() >= 1000
+    except Exception:
+        pass
 
     def sbub(txt):
         nonlocal bubble, bubble_t, bubble_dur
@@ -237,13 +247,19 @@ def interactive_loop(comp, name, compact_mode=False):
                             from .chat import stop_idle_gen, start_idle_gen
                             stop_idle_gen()
                             def _bg_reply(m=msg):
-                                nonlocal _thinking
+                                nonlocal _thinking, _sparkle
                                 try:
                                     from .chat import chat_reply, _load_history, _chat_history
                                     if not _chat_history:
                                         _load_history()
                                     r = chat_reply(m, name, comp)
                                     sbub(r if r else "(no response)")
+                                    # 检查是否解锁闪光成就
+                                    if not _sparkle:
+                                        from .chat import get_chat_total
+                                        if get_chat_total() >= 1000:
+                                            _sparkle = True
+                                            sbub("*sparkle* !! Something changed...")
                                 except Exception as e:
                                     sbub(f"(error: {e})")
                                 finally:
@@ -267,6 +283,10 @@ def interactive_loop(comp, name, compact_mode=False):
 
             if time.time() - last_act > 120:
                 mood = max(30, mood - 0.2)
+
+            # 隐藏闪光：颜色交替闪烁
+            if _sparkle:
+                c = SHINY if tick % 6 < 3 else c_base
 
             # 保持 "thinking..." 气泡不消失
             if _thinking and bubble == "thinking..." and (tick - bubble_t) >= bubble_dur - 2:
