@@ -88,16 +88,22 @@ def interactive_loop(comp, name, compact_mode=False):
     fd = sys.stdin.fileno()
     old = termios.tcgetattr(fd)
 
+    bubble_dur = BUBBLE_SHOW  # 当前气泡显示时长 (ticks)
+    _thinking = False         # LLM 正在生成中，阻塞输入
+
     def sbub(txt):
-        nonlocal bubble, bubble_t
+        nonlocal bubble, bubble_t, bubble_dur
         bubble, bubble_t = txt, tick
+        # 根据文字长度动态调整显示时长: 基础10秒 + 每20字符多3秒
+        length = dw(txt) if txt else 0
+        bubble_dur = max(BUBBLE_SHOW, BUBBLE_SHOW + (length // 20) * 6)
 
     def build():
         cols, rows = term_size()
         lines = []
 
         petting = (tick - pet_t) < PET_BURST
-        active_bub = bubble and (tick - bubble_t) < BUBBLE_SHOW
+        active_bub = bubble and (tick - bubble_t) < bubble_dur
         if petting or active_bub:
             sf = tick % 3; blink = False
         else:
@@ -150,7 +156,7 @@ def interactive_loop(comp, name, compact_mode=False):
 
         if active_bub:
             age = tick - bubble_t
-            fading = age >= BUBBLE_SHOW - FADE_WINDOW
+            fading = age >= bubble_dur - FADE_WINDOW
             bc = DIM if fading else ""
             inner_w = max(cols - 8, 10)
             wrapped = wrap_text(bubble, inner_w)
@@ -195,6 +201,8 @@ def interactive_loop(comp, name, compact_mode=False):
         while True:
             if select.select([sys.stdin], [], [], TICK_MS / 1000)[0]:
                 ch = sys.stdin.read(1)
+                if _thinking:
+                    continue  # LLM 生成中，忽略所有按键
                 if ch == '\x03':  # Ctrl+C 随时退出
                     if input_buf is not None:
                         input_buf = None
@@ -223,12 +231,13 @@ def interactive_loop(comp, name, compact_mode=False):
                             sbub(random.choice(REACTION["poke"]))
                         elif msg:
                             last_act = time.time()
+                            _thinking = True
                             sbub("thinking...")
                             import threading as _th
-                            # 暂停 idle 线程，避免与聊天抢 LLM 锁
                             from .chat import stop_idle_gen, start_idle_gen
                             stop_idle_gen()
                             def _bg_reply(m=msg):
+                                nonlocal _thinking
                                 try:
                                     from .chat import chat_reply, _load_history, _chat_history
                                     if not _chat_history:
@@ -238,6 +247,7 @@ def interactive_loop(comp, name, compact_mode=False):
                                 except Exception as e:
                                     sbub(f"(error: {e})")
                                 finally:
+                                    _thinking = False
                                     start_idle_gen(name, comp)
                             _th.Thread(target=_bg_reply, daemon=True).start()
                     elif ch in ('\x7f', '\x08'):  # backspace
@@ -259,10 +269,10 @@ def interactive_loop(comp, name, compact_mode=False):
                 mood = max(30, mood - 0.2)
 
             # 保持 "thinking..." 气泡不消失
-            if bubble == "thinking..." and (tick - bubble_t) >= BUBBLE_SHOW - 2:
+            if _thinking and bubble == "thinking..." and (tick - bubble_t) >= bubble_dur - 2:
                 bubble_t = tick
 
-            if (not bubble or (tick - bubble_t) >= BUBBLE_SHOW) and tick == next_idle_tick:
+            if (not bubble or (tick - bubble_t) >= bubble_dur) and tick == next_idle_tick:
                 from .chat import get_idle_bubble
                 idle = get_idle_bubble()
                 if idle:
