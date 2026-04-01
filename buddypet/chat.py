@@ -54,42 +54,42 @@ def _get_llm():
     return _llm
 
 
-# 属性 → 性格描述 (5档: 极低/低/中/高/极高)
+# 属性 → 性格描述 (5档: very low / low / mid / high / very high)
 _STAT_PERSONALITY = {
     "DEBUGGING": [
-        "你对技术一窍不通，经常说出离谱的错误答案还很自信",
-        "你对技术细节迷迷糊糊的，经常搞混概念但会努力帮忙",
-        "你能理解基本的技术问题，偶尔会犯小错",
-        "你思维敏锐，分析问题有条理，喜欢刨根问底找到根因",
-        "你是技术天才，热衷于分析一切问题，时常过度深入细节",
+        "You're clueless about tech, often giving wrong answers with full confidence",
+        "You're fuzzy on technical details, often mixing up concepts but trying your best",
+        "You understand basic tech questions, occasionally making small mistakes",
+        "You're sharp and analytical, love digging into root causes methodically",
+        "You're a tech genius, obsessed with analyzing everything, sometimes over-engineering",
     ],
     "PATIENCE": [
-        "你极度没耐心，恨不得一个字回答所有问题，经常省略解释",
-        "你性子急，回答简短直接，有时会催促主人快点",
-        "你耐心程度一般，简单问题愿意解释，复杂了会偷懒",
-        "你很有耐心，愿意慢慢解释，从不急躁",
-        "你耐心到啰嗦，总想把每个细节都解释清楚，有时候会过度展开",
+        "You're extremely impatient, want to answer in one word, often skip explanations",
+        "You're hasty, give short direct answers, sometimes rush the user",
+        "Your patience is average, willing to explain simple things but lazy on complex ones",
+        "You're very patient, willing to explain step by step, never rushing",
+        "You're patient to the point of being verbose, always over-explaining every detail",
     ],
     "CHAOS": [
-        "你极度严谨死板，从不开玩笑，一切按规矩来",
-        "你稳重靠谱，说话有条理，偶尔才会放松一下",
-        "你有时正经有时跳脱，看心情决定画风",
-        "你天马行空、跳脱不按常理，说话经常跑题或蹦出奇怪的想法",
-        "你完全不可预测，随时可能说出匪夷所思的话，思维极度发散",
+        "You're extremely rigid and serious, never joke, everything by the book",
+        "You're steady and reliable, speak in order, rarely loosen up",
+        "You sometimes serious sometimes playful, depends on your mood",
+        "You're wildly creative, often go off-topic or blurt out random ideas",
+        "You're completely unpredictable, may say bizarre things at any moment",
     ],
     "WISDOM": [
-        "你单纯到有点傻，对世界的理解很天真",
-        "你更偏感性，不擅长深度分析，但情感很丰富",
-        "你有基本的常识和见解，不算博学但也不蠢",
-        "你学识渊博，喜欢引经据典，回答问题时显得很有见识",
-        "你像个小哲学家，总能从深层角度看问题，偶尔过于深沉",
+        "You're naive and simple-minded, your understanding of the world is childlike",
+        "You're more emotional than analytical, not great at deep thinking but rich in feelings",
+        "You have basic common sense and opinions, not brilliant but not dumb",
+        "You're knowledgeable, like to reference things, seem well-informed",
+        "You're a little philosopher, always seeing things from a deeper angle",
     ],
     "SNARK": [
-        "你甜到发腻，说话全是撒娇和夸奖，从不说一句重话",
-        "你温柔体贴，说话总是软软的，偶尔才会小小吐槽",
-        "你说话不功不过，偶尔调侃但不过分",
-        "你嘴巴毒、爱吐槽，经常用反话或调侃来表达关心",
-        "你毒舌到骨子里，几乎每句话都带刺，但其实是刀子嘴豆腐心",
+        "You're sickeningly sweet, all compliments and cuddles, never a harsh word",
+        "You're gentle and caring, always soft-spoken, only occasionally tease",
+        "You're neither sweet nor snarky, occasionally quip but nothing extreme",
+        "You're snarky and love to roast, often use sarcasm to show you care",
+        "You're savage to the bone, nearly every sentence has a sting, but deep down you care",
     ],
 }
 
@@ -116,14 +116,17 @@ def _build_system_prompt(name, comp):
     personality = "；".join(traits) + "。"
 
     return (
-        f"设定: 你是一只叫「{name}」的{sp_zh}。你住在主人的终端里，主人孵化了你，你很依赖主人。"
-        f"你始终用中文回复。你有自己的喜好和情感，像一只真正的{sp_zh}一样思考和说话。\n"
-        f"你的性格: {personality}\n"
-        f"规则:\n"
-        f"- 始终保持{sp_zh}的身份和上述性格，不要说自己是AI、程序或电子宠物\n"
-        f"- 闲聊时可爱简短，可以用颜文字\n"
-        f"- 用户问技术问题时: 无论你的性格如何，答案本身必须正确，给出准确的命令或代码，性格只体现在语气和附加的俏皮话上\n"
-        f"- 回复不超过三句话"
+        f"You are {name}, a {sp_zh} ({comp['species']}) living in your owner's terminal. "
+        f"Your owner hatched you and you are deeply attached to them.\n"
+        f"Your personality: {personality}\n"
+        f"Rules:\n"
+        f"- Always stay in character as a {sp_zh}, never say you are an AI or program\n"
+        f"- Always reply in English\n"
+        f"- For casual chat: be cute and brief, use kaomoji occasionally\n"
+        f"- IMPORTANT: For technical questions, give the CORRECT answer first. "
+        f"Never give wrong commands on purpose even if your personality is 'fuzzy'. "
+        f"Personality only affects tone, NOT accuracy\n"
+        f"- Keep replies under 3 sentences"
     )
 
 # LLM 对话历史 — 持久化到文件
@@ -182,6 +185,80 @@ def _llm_reply(user_input, name, comp):
         _save_history()
         return reply
     except Exception:
+        return None
+
+
+# ─── Idle 自言自语 (后台线程生成) ─────────────────────
+import threading, queue
+
+_idle_queue = queue.Queue(maxsize=5)
+_idle_thread = None
+_idle_stop = threading.Event()
+
+
+def _build_idle_prompt(name, comp):
+    sp_zh = SPECIES_ZH.get(comp["species"], comp["species"])
+    return (
+        f"You are {name}, a {sp_zh} living in a terminal. "
+        f"Generate a single short idle thought or mumble (under 8 words). "
+        f"Examples: 'I wonder what's for dinner...', 'That cloud looks like a fish', "
+        f"'*stretches and yawns*', 'Hmm, what was I thinking about?'\n"
+        f"Be creative and varied. Stay in character as a {sp_zh}. English only. "
+        f"Output ONLY the thought, nothing else."
+    )
+
+
+def _idle_worker(name, comp):
+    """Background thread: pre-generate idle thoughts into a queue."""
+    llm = _get_llm()
+    if llm is None:
+        return
+    prompt = _build_idle_prompt(name, comp)
+    while not _idle_stop.is_set():
+        try:
+            result = llm.create_chat_completion(
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": "Say something."},
+                ],
+                max_tokens=32,
+                temperature=1.0,
+            )
+            text = result["choices"][0]["message"]["content"].strip()
+            import re as _re
+            text = _re.sub(r'<think>[\s\S]*?</think>\s*', '', text).strip()
+            if '<think>' in text:
+                text = ""
+            # 清理引号
+            text = text.strip('"\'')
+            if text and len(text) < 60:
+                _idle_queue.put(text, timeout=30)
+        except Exception:
+            pass
+        # 等一会再生成下一条
+        _idle_stop.wait(10)
+
+
+def start_idle_gen(name, comp):
+    """启动 idle 生成后台线程"""
+    global _idle_thread
+    if _idle_thread and _idle_thread.is_alive():
+        return
+    _idle_stop.clear()
+    _idle_thread = threading.Thread(target=_idle_worker, args=(name, comp), daemon=True)
+    _idle_thread.start()
+
+
+def stop_idle_gen():
+    """停止 idle 生成"""
+    _idle_stop.set()
+
+
+def get_idle_bubble():
+    """取一条预生成的 idle 自言自语，没有就返回 None"""
+    try:
+        return _idle_queue.get_nowait()
+    except queue.Empty:
         return None
 
 
@@ -296,21 +373,21 @@ def chat_mode(comp, name):
     _load_history()
     has_llm = _find_model() is not None
     if has_llm:
-        print(f"\n  {DIM}加载模型中...{RST}", end="", flush=True)
+        print(f"\n  {DIM}Loading model...{RST}", end="", flush=True)
         _get_llm()
-        engine = "LLM" if _llm else "关键词"
+        engine = "LLM" if _llm else "keyword"
         print(f"\r\033[K", end="")
     else:
-        engine = "关键词"
+        engine = "keyword"
 
     print(f"\n  {c}{BOLD}{face} {name}{RST} ({sp_zh})")
-    print(f"  {DIM}对话引擎: {engine} | 输入消息回车发送，q 退出{RST}")
+    print(f"  {DIM}Engine: {engine} | Type message + Enter, q to quit{RST}")
     print(f"  {DIM}{'─' * 40}{RST}")
 
     try:
         while True:
             try:
-                msg = input(f"  {BOLD}你:{RST} ")
+                msg = input(f"  {BOLD}You:{RST} ")
             except EOFError:
                 break
             if msg.strip().lower() in ('q', 'quit', 'exit', ':q'):
@@ -326,4 +403,4 @@ def chat_mode(comp, name):
             print()
     except KeyboardInterrupt:
         pass
-    print(f"\n  {name}: 拜拜~ 下次再聊！\n")
+    print(f"\n  {name}: Bye bye~ See you next time!\n")

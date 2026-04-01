@@ -180,6 +180,10 @@ def interactive_loop(comp, name, compact_mode=False):
 
     input_buf = None  # None=普通模式, str=正在输入
 
+    # 启动 idle 自言自语后台生成
+    from .chat import start_idle_gen, stop_idle_gen
+    start_idle_gen(name, comp)
+
     sys.stdout.write("\033[?25l\033[2J")
     sys.stdout.flush()
 
@@ -236,13 +240,16 @@ def interactive_loop(comp, name, compact_mode=False):
                 mood = max(30, mood - 0.2)
 
             if (not bubble or (tick - bubble_t) >= BUBBLE_SHOW) and tick % 30 == 15:
-                sbub(random.choice(IDLE_BUBBLES))
+                from .chat import get_idle_bubble
+                idle = get_idle_bubble()
+                sbub(idle if idle else random.choice(IDLE_BUBBLES))
 
             write_lines(build())
             tick += 1
     except (KeyboardInterrupt, EOFError):
         pass
     finally:
+        stop_idle_gen()
         termios.tcsetattr(fd, termios.TCSADRAIN, old)
         sys.stdout.write("\033[?25h\033[2J\033[H")
         sys.stdout.flush()
