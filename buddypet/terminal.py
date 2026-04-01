@@ -203,12 +203,16 @@ def interactive_loop(comp, name, compact_mode=False):
                         sys.stdout.write("\033[?25l")
                         sys.stdout.flush()
                         if msg:
-                            from .chat import chat_reply, _load_history, _chat_history
-                            if not _chat_history:
-                                _load_history()
                             last_act = time.time()
-                            reply = chat_reply(msg, name, comp)
-                            sbub(reply)
+                            sbub("...")  # 思考中
+                            import threading as _th
+                            def _bg_reply(m=msg):
+                                from .chat import chat_reply, _load_history, _chat_history
+                                if not _chat_history:
+                                    _load_history()
+                                r = chat_reply(m, name, comp)
+                                sbub(r)
+                            _th.Thread(target=_bg_reply, daemon=True).start()
                     elif ch in ('\x7f', '\x08'):  # backspace
                         input_buf = input_buf[:-1]
                     elif ch == '\x03':  # Ctrl+C 取消输入

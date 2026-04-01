@@ -167,11 +167,12 @@ def _llm_reply(user_input, name, comp):
     recent = _chat_history[-_MAX_HISTORY:]
     messages = [{"role": "system", "content": system_prompt}] + recent
     try:
-        result = llm.create_chat_completion(
-            messages=messages,
-            max_tokens=512,
-            temperature=0.7,
-        )
+        with _llm_lock:
+            result = llm.create_chat_completion(
+                messages=messages,
+                max_tokens=512,
+                temperature=0.7,
+            )
         reply = result["choices"][0]["message"]["content"].strip()
         # Qwen3 会输出 <think>...</think> 思考过程，只保留最终回复
         import re as _re
@@ -188,8 +189,9 @@ def _llm_reply(user_input, name, comp):
         return None
 
 
-# ─── Idle 自言自语 (后台线程生成) ─────────────────────
+# ─── LLM 线程安全锁 ──────────────────────────────────
 import threading, queue
+_llm_lock = threading.Lock()
 
 _idle_queue = queue.Queue(maxsize=5)
 _idle_thread = None
@@ -259,14 +261,15 @@ def _idle_worker(name, comp):
     idx = 0
     while not _idle_stop.is_set():
         try:
-            result = llm.create_chat_completion(
-                messages=[
-                    {"role": "system", "content": prompt},
-                    {"role": "user", "content": prompts_pool[idx % len(prompts_pool)]},
-                ],
-                max_tokens=32,
-                temperature=1.0,
-            )
+            with _llm_lock:
+                result = llm.create_chat_completion(
+                    messages=[
+                        {"role": "system", "content": prompt},
+                        {"role": "user", "content": prompts_pool[idx % len(prompts_pool)]},
+                    ],
+                    max_tokens=32,
+                    temperature=1.0,
+                )
             idx += 1
             text = result["choices"][0]["message"]["content"].strip()
             import re as _re
@@ -311,19 +314,20 @@ def get_care_reminder(name, comp):
     sp_zh = SPECIES_ZH.get(comp["species"], comp["species"])
     if llm:
         try:
-            result = llm.create_chat_completion(
-                messages=[
-                    {"role": "system", "content":
-                        f"You are {name}, a {sp_zh} ({comp['species']}). "
-                        f"Your owner has been working for over an hour. "
-                        f"Remind them to take a break in your own style. "
-                        f"Suggest ONE of: drink water, stretch, rest eyes, take a walk, grab a snack. "
-                        f"Keep it under 10 words, cute and caring. English only."},
-                    {"role": "user", "content": "Remind me."},
-                ],
-                max_tokens=32,
-                temperature=0.9,
-            )
+            with _llm_lock:
+                result = llm.create_chat_completion(
+                    messages=[
+                        {"role": "system", "content":
+                            f"You are {name}, a {sp_zh} ({comp['species']}). "
+                            f"Your owner has been working for over an hour. "
+                            f"Remind them to take a break in your own style. "
+                            f"Suggest ONE of: drink water, stretch, rest eyes, take a walk, grab a snack. "
+                            f"Keep it under 10 words, cute and caring. English only."},
+                        {"role": "user", "content": "Remind me."},
+                    ],
+                    max_tokens=32,
+                    temperature=0.9,
+                )
             text = result["choices"][0]["message"]["content"].strip()
             import re as _re
             text = _re.sub(r'<think>[\s\S]*?</think>\s*', '', text).strip()
