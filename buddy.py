@@ -3,9 +3,17 @@
 
 import os, sys
 # 自动加载 vendor/ 目录中的依赖（内网部署用）
-# 检查 vendor 里的 cpython .so 是否匹配当前 Python 版本
+# 如果系统已安装 llama_cpp（例如 GPU 版），优先用系统的
+# 否则检查 vendor 的 cpython .so 是否匹配当前 Python 版本
 _vendor = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vendor")
-if os.path.isdir(_vendor) and _vendor not in sys.path:
+_need_vendor = True
+try:
+    import llama_cpp as _test_llm
+    _need_vendor = False  # 系统已安装，不用 vendor
+    del _test_llm
+except ImportError:
+    pass
+if _need_vendor and os.path.isdir(_vendor) and _vendor not in sys.path:
     _pytag = f"cpython-{sys.version_info.major}{sys.version_info.minor}"
     _use_vendor = True
     for _root, _dirs, _files in os.walk(_vendor):

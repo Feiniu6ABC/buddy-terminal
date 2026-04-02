@@ -52,19 +52,22 @@ def _get_llm():
         n_gpu = 0
         try:
             from llama_cpp import Llama
-            # 尝试检测 CUDA 是否可用
             import ctypes
-            try:
-                ctypes.CDLL("libcuda.so")
-                n_gpu = -1  # 全部层 offload 到 GPU
-            except OSError:
-                pass
+            for lib in ["libcuda.so", "libcuda.so.1", "/usr/lib/wsl/lib/libcuda.so"]:
+                try:
+                    ctypes.CDLL(lib)
+                    n_gpu = -1
+                    break
+                except OSError:
+                    continue
         except ImportError:
             return None
         try:
+            # GPU: 大上下文, CPU: 省内存
+            ctx_size = 8192 if n_gpu else 2048
             _llm = Llama(
                 model_path=model_path,
-                n_ctx=1024,
+                n_ctx=ctx_size,
                 n_threads=4,
                 n_gpu_layers=n_gpu,
                 verbose=False,
@@ -151,7 +154,7 @@ def _build_system_prompt(name, comp):
 # LLM 对话历史 — 持久化到文件
 _chat_history = []       # 完整历史 (全部持久化到磁盘)
 _chat_total = 0          # 总对话条数 (用于闪光成就)
-_LLM_CONTEXT = 20        # 送入 LLM 的最近对话条数
+_LLM_CONTEXT = 40        # 送入 LLM 的最近对话条数
 _HISTORY_PATH = os.path.expanduser("~/.buddy-pet-history.json")
 
 
