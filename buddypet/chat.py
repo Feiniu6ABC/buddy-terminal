@@ -64,7 +64,7 @@ def _get_llm():
             return None
         try:
             # GPU: 大上下文, CPU: 省内存
-            ctx_size = 8192 if n_gpu else 2048
+            ctx_size = 32768 if n_gpu else 2048
             _llm = Llama(
                 model_path=model_path,
                 n_ctx=ctx_size,
@@ -154,7 +154,7 @@ def _build_system_prompt(name, comp):
 # LLM 对话历史 — 持久化到文件
 _chat_history = []       # 完整历史 (全部持久化到磁盘)
 _chat_total = 0          # 总对话条数 (用于闪光成就)
-_LLM_CONTEXT = 40        # 送入 LLM 的最近对话条数
+_LLM_CONTEXT = 100       # 送入 LLM 的最近对话条数
 _HISTORY_PATH = os.path.expanduser("~/.buddy-pet-history.json")
 
 
