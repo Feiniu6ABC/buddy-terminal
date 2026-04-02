@@ -48,12 +48,25 @@ def _get_llm():
         model_path = _find_model()
         if not model_path:
             return None
+        # 检测 GPU，有 CUDA 就全部 offload
+        n_gpu = 0
         try:
             from llama_cpp import Llama
+            # 尝试检测 CUDA 是否可用
+            import ctypes
+            try:
+                ctypes.CDLL("libcuda.so")
+                n_gpu = -1  # 全部层 offload 到 GPU
+            except OSError:
+                pass
+        except ImportError:
+            return None
+        try:
             _llm = Llama(
                 model_path=model_path,
                 n_ctx=1024,
                 n_threads=4,
+                n_gpu_layers=n_gpu,
                 verbose=False,
             )
         except Exception:
