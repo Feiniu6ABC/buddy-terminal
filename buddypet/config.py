@@ -9,14 +9,19 @@ from .constants import CONFIG_PATH, DIM, RST
 def _find_tmux():
     """查找 tmux: 优先用自带的 bin/tmux，再找系统的"""
     import shutil
-    bundled = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin", "tmux")
+    bin_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin")
+    bundled = os.path.join(bin_dir, "tmux")
     if os.path.isfile(bundled) and os.access(bundled, os.X_OK):
         # 设置库搜索路径
-        lib_dir = os.path.join(os.path.dirname(bundled), "lib")
+        lib_dir = os.path.join(bin_dir, "lib")
         if os.path.isdir(lib_dir):
             ld = os.environ.get("LD_LIBRARY_PATH", "")
             if lib_dir not in ld:
                 os.environ["LD_LIBRARY_PATH"] = f"{lib_dir}:{ld}" if ld else lib_dir
+        # 设置 terminfo 路径
+        ti_dir = os.path.join(bin_dir, "terminfo")
+        if os.path.isdir(ti_dir):
+            os.environ["TERMINFO"] = ti_dir
         return bundled
     return shutil.which("tmux")
 
