@@ -68,8 +68,8 @@ def dock_companion():
     if os.environ.get("TMUX"):
         os.system(f'{tmux} set-option mouse on')
         os.system(f'{tmux} split-window -h -l 20 "{launcher} compact"')
-        print(f"  宠物已停靠在右侧窗格！")
-        print(f"  {DIM}鼠标点击宠物窗格即可互动 | 关闭: python3 {bn} undock{RST}")
+        print(f"  Pet docked on the right!")
+        print(f"  {DIM}Click pet pane to interact | Close: {bn} undock{RST}")
     else:
         os.system(f'{tmux} new-session -d -s buddy')
         os.system(f'{tmux} set-option -t buddy mouse on')

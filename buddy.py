@@ -97,7 +97,7 @@ def main():
 
     def need_companion():
         if not cfg.get("companion"):
-            print(f"\n  还没有伙伴！用 'hatch' 孵化。\n")
+            print(f"\n  No companion yet! Use 'hatch' to get one.\n")
             return None, None
         co = roll_companion(cfg["user_id"])
         nm = cfg["companion"].get("name", "???")
@@ -105,15 +105,15 @@ def main():
 
     if args.cmd == "hatch":
         if cfg.get("companion"):
-            print(f"\n  你已经有伙伴了！用 'show' 查看，'reset' 重新来。\n")
+            print(f"\n  You already have a companion! Use 'show' to view, 'reset' to start over.\n")
             print(render_card(roll_companion(cfg["user_id"]), cfg["companion"].get("name")))
             return
         uid = args.id or str(uuid.uuid4())
         co = roll_companion(uid)
         nm = args.name
         if not nm:
-            dflt = f"小{SPECIES_ZH[co['species']]}"
-            try: nm = input(f"  给你的{SPECIES_ZH[co['species']]}起名字 [{dflt}]: ").strip()
+            dflt = f"Buddy"
+            try: nm = input(f"  Name your {co['species']} [{dflt}]: ").strip()
             except (EOFError, KeyboardInterrupt): nm = ""
             if not nm: nm = dflt
         cfg["user_id"] = uid
@@ -126,7 +126,7 @@ def main():
         if not co: return
         print(); print(render_card(co, nm))
         ht = cfg["companion"].get("hatched_at", 0)
-        if ht: print(f"  {DIM}相伴 {(int(time.time()) - ht) // 86400} 天{RST}")
+        if ht: print(f"  {DIM}Together for {(int(time.time()) - ht) // 86400} days{RST}")
         print()
 
     elif args.cmd == "pet":
@@ -171,15 +171,15 @@ def main():
     elif args.cmd == "reset":
         if cfg.get("companion"):
             nm = cfg["companion"].get("name", "???")
-            try: ok = input(f"  确定放走 {nm}？(y/N): ").strip().lower()
+            try: ok = input(f"  Release {nm}? (y/N): ").strip().lower()
             except: ok = ""
             if ok == "y":
                 del cfg["companion"]
                 cfg.pop("user_id", None)
                 save_config(cfg)
-                print(f"  {nm} 走了... 👋")
-            else: print("  取消。")
-        else: print("  没有伙伴。")
+                print(f"  {nm} is gone... bye~")
+            else: print("  Cancelled.")
+        else: print("  No companion.")
 
     elif args.cmd == "rename":
         co, nm = need_companion()

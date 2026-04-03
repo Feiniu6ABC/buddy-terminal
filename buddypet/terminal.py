@@ -53,12 +53,12 @@ def render_card(comp, name=None):
         lines.append(f"  {BOLD}{name}{RST} the {SPECIES_ZH[sp]} ({sp})")
     else:
         lines.append(f"  {SPECIES_ZH[sp]} ({sp})")
-    lines.append(f"  眼睛: {comp['eye']}  帽子: {HATS_ZH[comp['hat']]}")
+    lines.append(f"  Eye: {comp['eye']}  Hat: {HATS_ZH[comp['hat']]}")
     lines.append(f"{c}{'─' * 44}{RST}")
     for sl in render_sprite(comp, 0):
         lines.append(f"{c}      {sl}{RST}")
     lines.append(f"{c}{'─' * 44}{RST}")
-    lines.append(f"  {BOLD}属性{RST}")
+    lines.append(f"  {BOLD}Stats{RST}")
     mx, mn = max(comp["stats"].values()), min(comp["stats"].values())
     for sn, v in comp["stats"].items():
         bar = "█" * (v // 5) + "░" * (20 - v // 5)
@@ -348,7 +348,7 @@ def hatch_animation(comp, name):
     sys.stdout.flush()
     try:
         for i, egg in enumerate(EGG):
-            lines = ["", f"  {DIM}正在孵化...{RST}", ""]
+            lines = ["", f"  {DIM}Hatching...{RST}", ""]
             for el in egg:
                 lines.append(f"      {el}")
             lines.append("")
@@ -356,7 +356,7 @@ def hatch_animation(comp, name):
             write_lines(lines)
             time.sleep(0.5)
 
-        write_lines(["", f"  {c}{BOLD}✨ 孵化成功！✨{RST}"])
+        write_lines(["", f"  {c}{BOLD}Hatched!{RST}"])
         time.sleep(0.8)
 
         card = render_card(comp, name).split("\n")
@@ -383,7 +383,7 @@ def idle_animation(comp, name):
         while True:
             lines = []
             lines.append(f"  {c}{BOLD}{stars} {name} the {sp_zh}{RST}")
-            lines.append(f"  {DIM}Ctrl+C 退出{RST}")
+            lines.append(f"  {DIM}Ctrl+C to exit{RST}")
             lines.append("")
             for sl in render_sprite(comp, frame):
                 lines.append(f"{c}      {sl}{RST}")
@@ -440,7 +440,7 @@ def pet_once(comp, name):
 
 
 def show_gallery():
-    print(f"\n  {BOLD}═══ 物种图鉴 ({len(SPECIES)} 种) ═══{RST}\n")
+    print(f"\n  {BOLD}=== Species Gallery ({len(SPECIES)} types) ==={RST}\n")
     for i in range(0, len(SPECIES), 3):
         batch = SPECIES[i:i+3]
         sprites = []
@@ -460,20 +460,20 @@ def show_gallery():
                 ln += f"  {sprites[j][row]:18s}"
             print(ln)
         print()
-    print(f"  {DIM}帽子: 皇冠/礼帽/螺旋桨/光环/巫师帽/毛线帽/头顶小鸭 (common 无帽){RST}")
-    print(f"  {DIM}眼睛: · ✦ × ◉ @ °{RST}\n")
+    print(f"  {DIM}Hats: crown/tophat/propeller/halo/wizard/beanie/tinyduck (common=none){RST}")
+    print(f"  {DIM}Eyes: · ✦ × ◉ @ °{RST}\n")
 
 
 def show_odds():
-    print(f"\n  {BOLD}═══ 稀有度概率 ═══{RST}\n")
+    print(f"\n  {BOLD}=== Rarity Odds ==={RST}\n")
     for r in RARITIES:
         w = RARITY_WEIGHTS[r]
         print(f"  {RARITY_COLORS[r]}{RARITY_STARS[r]:5s} {r:10s} {'█' * w}{'░' * (60-w)} {w}%{RST}")
-    print(f"\n  {DIM}闪光(Shiny): 1%  最稀有: Legendary+Shiny = 0.01%{RST}\n")
+    print(f"\n  {DIM}Shiny: 1%  Rarest: Legendary+Shiny = 0.01%{RST}\n")
 
 
 def search_legendary(n=10):
-    print(f"\n  {BOLD}搜索 Legendary...{RST}")
+    print(f"\n  {BOLD}Searching Legendary...{RST}")
     found = sh = 0
     for i in range(1000000):
         co = roll_companion(f"seed-{i:08d}")
@@ -481,7 +481,7 @@ def search_legendary(n=10):
             found += 1
             s = "✨SHINY" if co["shiny"] else ""
             cl = SHINY if co["shiny"] else RARITY_COLORS["legendary"]
-            print(f"  {cl}★★★★★ {SPECIES_ZH[co['species']]}({co['species']}) 眼={co['eye']} 帽={HATS_ZH[co['hat']]} {s}{RST}  (seed-{i:08d})")
+            print(f"  {cl}★★★★★ {co['species']} eye={co['eye']} hat={co['hat']} {s}{RST}  (seed-{i:08d})")
             if co["shiny"]: sh += 1
             if found >= n: break
-    print(f"\n  {DIM}{i+1} 个种子中 {found} 个 Legendary ({sh} 个 Shiny){RST}\n")
+    print(f"\n  {DIM}{found} Legendary ({sh} Shiny) in {i+1} seeds{RST}\n")
